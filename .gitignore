@@ -1,0 +1,38 @@
+# Sqlite DB
+covenant.db
+covenant.db-journal
+covenant.db-wal
+covenant.db-shm
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+bld/
+[Bb]in/
+[Oo]bj/
+dotnetwarp_temp/
+Optimize/
+_/
+
+# Covenant Logs
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio cache/options
+.vs/
+.vscode/
+*.user
+*.userprefs
+
+# Mac files
+*.DS_Store
+
+# Private keys
+*.pfx
+
+# Public keys
+*.cer
