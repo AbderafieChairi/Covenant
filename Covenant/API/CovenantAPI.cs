@@ -7008,7 +7008,6 @@ namespace Covenant.API
             _httpRequest.RequestUri = new System.Uri(_url);
             // Console.WriteLine(_url);
             
-            // System.IO.File.AppendAllText("body.json", JsonConvert.SerializeObject(body));
 
             // Set Headers
 

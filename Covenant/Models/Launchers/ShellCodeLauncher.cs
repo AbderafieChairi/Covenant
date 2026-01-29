@@ -7,8 +7,6 @@ using System.IO;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 
-using Donut;
-using Donut.Structs;
 
 using Covenant.Core;
 using Covenant.Models.Listeners;
@@ -33,22 +31,22 @@ namespace Covenant.Models.Launchers
             string inputf = Common.CovenantTempDirectory + Utilities.GetSanitizedFilename(template.Name + ".exe");
             string outputf = Common.CovenantTempDirectory + Utilities.GetSanitizedFilename(template.Name + ".bin");
             File.WriteAllBytes(inputf, StagerAssembly);
-            DonutConfig config = new DonutConfig
-            {
-                Arch = 3,
-                Bypass = 3,
-                InputFile = inputf,
-                Class = "GruntStager",
-                Method = "Execute",
-                Args = "",
-                Payload = outputf
-            };
-            int ret = Generator.Donut_Create(ref config);
-            if (ret == Constants.DONUT_ERROR_SUCCESS)
-            {
-                this.Base64ILByteString = Convert.ToBase64String(File.ReadAllBytes(outputf));
-                this.LauncherString = template.Name + ".bin";
-            }
+            // DonutConfig config = new DonutConfig
+            // {
+            //     Arch = 3,
+            //     Bypass = 3,
+            //     InputFile = inputf,
+            //     Class = "GruntStager",
+            //     Method = "Execute",
+            //     Args = "",
+            //     Payload = outputf
+            // };
+            // int ret = Generator.Donut_Create(ref config);
+            // if (ret == Constants.DONUT_ERROR_SUCCESS)
+            // {
+            //     this.Base64ILByteString = Convert.ToBase64String(File.ReadAllBytes(outputf));
+            //     this.LauncherString = template.Name + ".bin";
+            // }
             return this.LauncherString;
         }
 

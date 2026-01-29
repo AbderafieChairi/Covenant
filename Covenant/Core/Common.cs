@@ -37,8 +37,8 @@ namespace Covenant.Core
         public static string CovenantAssemblyReferenceNet40Directory = CovenantAssemblyReferenceDirectory + "net40" + Path.DirectorySeparatorChar;
         public static string CovenantEmbeddedResourcesDirectory = CovenantDataDirectory + "EmbeddedResources" + Path.DirectorySeparatorChar;
         public static string CovenantReferenceSourceLibraries = CovenantDataDirectory + "ReferenceSourceLibraries" + Path.DirectorySeparatorChar;
-        public static string CovenantSharpSploitDirectory = CovenantReferenceSourceLibraries + "SharpSploit" + Path.DirectorySeparatorChar;
-        public static string CovenantRubeusDirectory = CovenantReferenceSourceLibraries + "Rubeus" + Path.DirectorySeparatorChar;
+
+
 
         public static string CovenantTaskDirectory = CovenantDataDirectory + "Tasks" + Path.DirectorySeparatorChar;
         public static string CovenantTaskCSharpDirectory = CovenantTaskDirectory + "CSharp" + Path.DirectorySeparatorChar;

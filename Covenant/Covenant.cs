@@ -60,18 +60,14 @@ namespace Covenant
                 "The Port number to bind Covenant to. (env: COVENANT_PORT)",
                 CommandOptionType.SingleValue
             );
+            var AdminhostOption = app.Option(
+                "-i | --adminhost <HOST>",
+                "The Host to bind Covenant to. (env: COVENANT_ADMIN_HOST)",
+                CommandOptionType.SingleValue
+            );
 
             app.OnExecute(() =>
             {
-                if (!File.Exists(Path.Combine(Common.CovenantSharpSploitDirectory, "SharpSploit.sln")) ||
-                    !File.Exists(Path.Combine(Common.CovenantRubeusDirectory, "Rubeus.sln")))
-                {
-                    Console.Error.WriteLine("Error: git submodules have not been initialized");
-                    Console.Error.WriteLine("Covenant's submodules can be cloned with: git clone --recurse-submodules https://github.com/cobbr/Covenant");
-                    Console.Error.WriteLine("Or initialized after cloning with: git submodule update --init --recursive");
-                    return -1;
-                }
-
                 string username = UserNameOption.HasValue() ? UserNameOption.Value() : Environment.GetEnvironmentVariable("COVENANT_USERNAME");
                 string password = PasswordOption.HasValue() ? PasswordOption.Value() : Environment.GetEnvironmentVariable("COVENANT_PASSWORD");
                 if (!string.IsNullOrEmpty(username) && string.IsNullOrEmpty(password))
@@ -82,7 +78,10 @@ namespace Covenant
                 }
 
                 string CovenantBindUrl = ComputerNameOption.HasValue() ? ComputerNameOption.Value() : Environment.GetEnvironmentVariable("COVENANT_COMPUTER_NAME"); ;
-                if (string.IsNullOrEmpty(CovenantBindUrl))
+                if (AdminhostOption.HasValue())
+                {
+                    CovenantBindUrl = AdminhostOption.Value();
+                }else if (string.IsNullOrEmpty(CovenantBindUrl))
                 {
                     CovenantBindUrl = "0.0.0.0";
                 }

@@ -2864,12 +2864,6 @@ using System.Text;
 using System.Security;
 using System.Security.Principal;
 using System.Collections.Generic;
-using SharpSploit.Credentials;
-using SharpSploit.Enumeration;
-using SharpSploit.Execution;
-using SharpSploit.Generic;
-using SharpSploit.Misc;
-using SharpSploit.LateralMovement;
 
 public static class Task
 {{
