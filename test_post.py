@@ -1,0 +1,14 @@
+import requests
+
+url = "http://192.168.75.1:8080/en-us/index.html"
+
+querystring = {"page":"d019ff0aaf","v":"1"}
+
+payload = "i=a19ea23062db990386a3a478cb89d52e&data=eyJHVUlEIjoiNmNmMTU1ZmIzNmRhNjVmNjgxZTIiLCJUeXBlIjowLCJNZXRhIjoiIiwiSVYiOiJ5RUU1ejJWZzVKZFV0ODB3T29Va0VRPT0iLCJFbmNyeXB0ZWRNZXNzYWdlIjoidnRidFBleTZuZmlSV21TeC8xcjlrMU9tMndhSXJpQSs0M1dSZ0hSSldpbGRRSnpzRmhWL0VqcnlzMC8zaXovSnIzR3U4RytLS1JPTWtHWHVlWFpSYWtVRzZyU0h5d0R5SEtFNnR3Z1ZSUkVYd1l4VDNUSVJZTDhaRmJyMjdDSm5QdVdEb05nWDFiajlCNllmd01uckN4c1BBQlV0bDl3dmlIUnBNMzlRazcyaklhSXlRbDBTMm0za09OQ3djMnVGVFJKTEEreUZmdGRSQVhXZlBaSmxzS1AzZTJzWm4xSTI0QlpXdUlYdHNiUlgrZGk5dFE1QmZnTFRTSTZMdHp5djhNWm9Gdm1tTUZWWCthanNzNlhFSXJ4NzJLdm8xV0VGQ1RLUE0rTkh6Um5zY09MaDVyNXFSZU1zS0Jwd1lIZXd0U0I3MzEzUDJyYUpYc1Ezb2trWmJKZUpxcjl5WDFPK090c3djZGdCd1AwNWQ1TU9BWjVTYjRMZ2RMV0hpUXF3ditJeXJHenRPR2V2QXlxcHFheDVEQTVkZ3lyTHR5UG5NbklWNUdaQ0xHSkRkQ3c3MlNuOFlmMnQ2dEp2aUFhUFdVN2NCcnZjT25Tc0hVUGdHVnM4UTFIMVFzSlF4N3kwZ3pBcUZnVVg1WndWVlVIbEJGTTJuK2d4N05JWTl3TE1xcE1BdE1oQms0b1lwWFF3Y0VRTHVub2dsUkkySGlDUTBub214QUhadEtNPSIsIkhNQUMiOiJpRHgzT2pPWVF5eTFGVmpPbm5Va0JvZXQ2czdaZytNMU1rSHlxSU1xYmI0PSJ9&session=75db-99b1-25fe4e9afbe58696-320bea73"
+headers = {"Accept": "*/*"}
+
+response = requests.request("POST", url, data=payload, headers=headers, params=querystring)
+print("status : ",response.status_code)
+for key, value in response.headers.items():
+    print(f"{key}: {value}")
+print(response.text)

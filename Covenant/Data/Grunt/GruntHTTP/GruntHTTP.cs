@@ -420,14 +420,21 @@ namespace GruntExecutor
 
         private static GruntEncryptedMessage Parse(string Format, string Message)
         {
-            string json = Common.GruntEncoding.GetString(Utilities.MessageTransform.Invert(
-                Utilities.Parse(Message, Format)[0]
-            ));
-            if (json == null || json.Length < 3)
+            try
+            {
+                string json = Common.GruntEncoding.GetString(Utilities.MessageTransform.Invert(
+                    Utilities.Parse(Message, Format)[0]
+                ));
+                if (json == null || json.Length < 3)
+                {
+                    return null;
+                }
+                return GruntEncryptedMessage.FromJson(json);
+            }
+            catch (Exception)
             {
                 return null;
             }
-            return GruntEncryptedMessage.FromJson(json);
         }
 
         private static string Format(string Format, GruntEncryptedMessage Message)

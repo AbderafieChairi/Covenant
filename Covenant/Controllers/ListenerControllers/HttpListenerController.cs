@@ -41,24 +41,40 @@ namespace Covenant.Controllers
         [AllowAnonymous]
         public async Task<ActionResult<string>> Route()
         {
+            LogToFile($"[*] Received HTTP {HttpContext.Request.Method} from Grunt...");
             string guid = "";
+            
             try
             {
                 this.SetHeaders();
+                LogToFile("[*] Parsing GUID from request...");
                 guid = GetGuid(HttpContext);
+                LogToFile($"[*] Extracted GUID: {guid}");
+                LogToFile($"[*] Request Path: {HttpContext.Request.Path}");
+                LogToFile($"[*] Request Query: {HttpContext.Request.QueryString}");
+
                 if (HttpContext.Request.Method == "GET")
                 {
+                    LogToFile("[*] Received HTTP GET from Grunt...");
                     string response = String.Format(_context.HttpProfiles.First().HttpGetResponse.Replace("{", "{{").Replace("}", "}}").Replace("{{DATA}}", "{0}").Replace("{{GUID}}", "{1}"), await _internalListener.Read(guid), guid);
                     return Ok(response);
 		        }
 		        else if (HttpContext.Request.Method == "POST")
                 {
+                    LogToFile("[*] Received HTTP POST from Grunt...");
                     using StreamReader reader = new StreamReader(Request.Body, System.Text.Encoding.UTF8);
                     string body = await reader.ReadToEndAsync();
+                    LogToFile($"[*] POST Body: {body}");
+                    LogToFile($"[*] HttpPostRequest : {_context.HttpProfiles.First().HttpPostRequest}");
                     string ExtractedMessage = body.ParseExact(_context.HttpProfiles.First().HttpPostRequest.Replace("{", "{{").Replace("}", "}}").Replace("{{DATA}}", "{0}").Replace("{{GUID}}", "{1}")).FirstOrDefault();
+                    LogToFile($"[*] Extracted Message: {ExtractedMessage}");
                     string guidToRead = await _internalListener.Write(guid, ExtractedMessage);
+                    LogToFile($"[*] Written message to internal listener with GUID: {guidToRead}");
                     string postRead = await _internalListener.Read(guidToRead);
+                    LogToFile($"[*] Read response from internal listener: {postRead}");
                     string response = String.Format(_context.HttpProfiles.First().HttpPostResponse.Replace("{", "{{").Replace("}", "}}").Replace("{{DATA}}", "{0}").Replace("{{GUID}}", "{1}"), postRead, guid);
+                    Console.WriteLine("[*] Sending response back to Grunt...");
+                    LogToFile("[*] Sending response back to Grunt (200 OK)...");
                     return Ok(response);
                 }
 		        else
@@ -68,12 +84,14 @@ namespace Covenant.Controllers
             }
             catch (ControllerNotFoundException e)
             {
-                string response = String.Format(_context.HttpProfiles.First().HttpGetResponse.Replace("{DATA}", "{0}").Replace("{GUID}", "{1}"), e.Message, guid);
-                return NotFound(response);
+                LogToFile($"[!] ControllerNotFoundException: {e.Message} - {e.StackTrace}");
+                string response = String.Format(_context.HttpProfiles.First().HttpGetResponse.Replace("{DATA}", "{0}").Replace("{GUID}", "{1}"), "ControllerNotFoundException ::::: "+ e.Message, guid);
+                return Ok(response);
             }
             catch (Exception e)
             {
-                string response = String.Format(_context.HttpProfiles.First().HttpGetResponse.Replace("{DATA}", "{0}").Replace("{GUID}", "{1}"), e.Message, guid);
+                LogToFile($"[!] Exception: {e.Message} - {e.StackTrace}");
+                string response = String.Format(_context.HttpProfiles.First().HttpGetResponse.Replace("{DATA}", "{0}").Replace("Exception ::::: {GUID}", "{1}"), e.Message, guid);
                 return NotFound(response);
             }
         }
@@ -117,6 +135,15 @@ namespace Covenant.Controllers
             if (match.Groups["group4"] != null) { matches.Add(match.Groups["group4"].Value); }
             if (match.Groups["group5"] != null) { matches.Add(match.Groups["group5"].Value); }
             return matches;
+        }
+        private static void LogToFile(string message)
+        {
+            try
+            {
+                string logFile = "listener_debug.txt";
+                System.IO.File.AppendAllText(logFile, $"{DateTime.Now}: {message}{Environment.NewLine}");
+            }
+            catch { }
         }
     }
 }

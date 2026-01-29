@@ -193,7 +193,13 @@ namespace Covenant.Controllers
         {
             try
             {
-                return await _service.EditGrunt(grunt, await _service.GetCurrentUser(HttpContext.User));
+                CovenantUser user = null;
+                try
+                {
+                    user = await _service.GetCurrentUser(HttpContext.User);
+                }
+                catch (ControllerNotFoundException) { }
+                return await _service.EditGrunt(grunt, user);
             }
             catch (ControllerNotFoundException e)
             {
@@ -238,8 +244,13 @@ namespace Covenant.Controllers
         {
             try
             {
-                CovenantUser user = await _service.GetCurrentUser(this.HttpContext.User);
-                GruntCommand gruntCommand = await _service.InteractGrunt(id, user.Id, command);
+                CovenantUser user = null;
+                try
+                {
+                    user = await _service.GetCurrentUser(this.HttpContext.User);
+                }
+                catch (ControllerNotFoundException) { }
+                GruntCommand gruntCommand = await _service.InteractGrunt(id, user?.Id, command);
                 return CreatedAtRoute("GetGruntCommand", new { id = gruntCommand.Id }, gruntCommand);
             }
             catch (ControllerNotFoundException e)

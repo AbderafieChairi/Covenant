@@ -68,6 +68,7 @@ namespace Covenant.Models.Listeners
 
         public InternalListener(APIModels.Profile profile, string ListenerGuid, string CovenantUrl, string CovenantToken)
         {
+
             _ = Configure(profile, ListenerGuid, CovenantUrl, CovenantToken);
         }
 
@@ -109,6 +110,7 @@ namespace Covenant.Models.Listeners
                     return cert.GetCertHashString() == covenantCert.GetCertHashString();
                 }
             };
+            // Console.WriteLine("[*] CovenantToken : " + CovenantToken);
             _client = new CovenantAPI(
                 new Uri(CovenantUrl),
                 new TokenCredentials(CovenantToken),
@@ -261,6 +263,8 @@ namespace Covenant.Models.Listeners
 
         private void PushCache(string guid, GruntMessageCacheInfo cacheEntry)
         {
+            // Console.WriteLine($"[DEBUG] Pushing cache for GUID: {guid} with Status: {cacheEntry.Status} and Message: {cacheEntry.Message}");
+
             if (this.GruntMessageCache.TryGetValue(guid, out ConcurrentQueue<GruntMessageCacheInfo> cacheQueue))
             {
                 lock (_hashCodesLock)
@@ -323,6 +327,7 @@ namespace Covenant.Models.Listeners
 
         public async Task<string> Read(string guid)
         {
+            // Console.WriteLine($"[DEBUG] InternalListener Read called for GUID: {guid}");
             if (string.IsNullOrEmpty(guid))
             {
                 return "";
@@ -407,20 +412,37 @@ namespace Covenant.Models.Listeners
 
         public async Task<string> Write(string guid, string data)
         {
+            // Console.WriteLine($"[*] InternalListener Write called for GUID: {guid}");
+            try
+            {
+
+                var user = await _client.GetCurrentUserWithHttpMessagesAsync();
+                // Console.WriteLine($"[*] Current User: {user.Body.UserName} (ID: {user.Body.Id})");
+            }
+            catch (Exception ex )
+            {
+                // Console.WriteLine($"[!] Exception getting current user: {ex.Message} - {ex.StackTrace}");
+                // Environment.Exit(1);
+            }   
+            
             try
             {
                 ModelUtilities.GruntEncryptedMessage message = null;
                 try
                 {
-                    string inverted = Common.CovenantEncoding.GetString(this._utilities.ProfileInvert(_transform, data));
+                    string inverted = Common.CovenantEncoding.GetString(_utilities.ProfileInvert(_transform, data));
+                    // Console.WriteLine($"[*] Inverted message: {inverted}");
                     message = JsonConvert.DeserializeObject<ModelUtilities.GruntEncryptedMessage>(inverted);
+                    // Console.WriteLine($"[*] Parsed GruntEncryptedMessage with \nGUID: {message.GUID}\nType: {message.Type}\nMeta: {message.Meta} \nEncryptedMessage Length: {message.EncryptedMessage}");
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
+                    // Console.WriteLine($"[!] Exception parsing GruntEncryptedMessage: {e.Message} - {e.StackTrace}");
                     // Request not formatted correctly. May not be legitimate Grunt request, respond NotFound
                     this.PushCache(guid, new GruntMessageCacheInfo { Status = GruntMessageCacheStatus.NotFound, Message = "", Tasking = null });
                     return guid;
                 }
+                // Console.WriteLine($"[*] Extracted GUID from message: {message.GUID}");
                 APIModels.Grunt egressGrunt;
                 try
                 {
@@ -430,20 +452,25 @@ namespace Covenant.Models.Listeners
                 {
                     egressGrunt = null;
                 }
+                // Console.WriteLine($"[*] Egress Grunt for GUID {guid}: {(egressGrunt != null ? egressGrunt.Guid : "null")}");
                 APIModels.Grunt targetGrunt = null;
                 try
                 {
                     targetGrunt = await _client.GetGruntByGUIDAsync(message.GUID);
+                    // Console.WriteLine($"[*] Target Grunt for GUID {guid}: {(targetGrunt != null ? targetGrunt.Guid : "null")}");
                 }
                 catch (HttpOperationException)
                 {
                     targetGrunt = null;
                     // Stage0 Guid is OriginalServerGuid + Guid
+                    // Console.WriteLine($"[*] message GUID length: {message.GUID.Length}");
                     if (message.GUID.Length == 20)
                     {
                         string originalServerGuid = message.GUID.Substring(0, 10);
                         guid = message.GUID.Substring(10, 10);
+                        // Console.WriteLine($"[*] Extracted OriginalServerGuid: {originalServerGuid} and GUID: {guid} from message GUID");
                         targetGrunt = await _client.GetGruntByOriginalServerGUIDAsync(originalServerGuid);
+                        // Environment.Exit(0);
                         if (targetGrunt != null)
                         {
                             var it = await _client.GetImplantTemplateAsync(targetGrunt.ImplantTemplateId);
@@ -468,12 +495,13 @@ namespace Covenant.Models.Listeners
                                 }
                             }
                         }
-                        await this.PostStage0(egressGrunt, targetGrunt, message, message.GUID.Substring(10), guid);
+                        // Console.WriteLine("[*] egressGrunt: " + (egressGrunt != null ? egressGrunt.Guid : "null") + ", targetGrunt: " + (targetGrunt != null ? targetGrunt.Guid : "null"));
+                        await PostStage0(egressGrunt, targetGrunt, message, message.GUID[10..], guid);
                         return guid;
                     }
                     else
                     {
-                        this.PushCache(guid, new GruntMessageCacheInfo { Status = GruntMessageCacheStatus.NotFound, Message = "", Tasking = null });
+                        PushCache(guid, new GruntMessageCacheInfo { Status = GruntMessageCacheStatus.NotFound, Message = "", Tasking = null });
                         return guid;
                     }
                 }
@@ -581,17 +609,23 @@ namespace Covenant.Models.Listeners
 
         private async Task PostStage0(APIModels.Grunt egressGrunt, APIModels.Grunt targetGrunt, ModelUtilities.GruntEncryptedMessage gruntStage0Response, string targetGuid, string guid)
         {
+            // Console.WriteLine($"[*] PostStage0 called for targetGuid: {targetGuid} and guid: {guid}");
+
             if (targetGrunt == null || !gruntStage0Response.VerifyHMAC(Convert.FromBase64String(targetGrunt.GruntSharedSecretPassword)))
             {
+                // Console.WriteLine(!gruntStage0Response.VerifyHMAC(Convert.FromBase64String(targetGrunt.GruntSharedSecretPassword)) ? "[*] HMAC verification failed." : "[*] TargetGrunt is null.");
                 // Always return NotFound, don't give away unnecessary info
                 this.PushCache(guid, new GruntMessageCacheInfo { Status = GruntMessageCacheStatus.NotFound, Message = "", Tasking = null });
                 return;
             }
+            // Console.WriteLine("[*] HMAC verification passed.");
 
             bool egressGruntExists = egressGrunt != null;
+            // Console.WriteLine($"[*] EgressGrunt exists: {egressGruntExists}");
 
             if (targetGrunt.Status != APIModels.GruntStatus.Uninitialized)
             {
+                // Console.WriteLine($"[*] TargetGrunt status is {targetGrunt.Status}, creating new Grunt.");
                 // We create a new Grunt if this one is not uninitialized
                 APIModels.Grunt tempModel = new APIModels.Grunt
                 {
@@ -614,34 +648,55 @@ namespace Covenant.Models.Listeners
                     LastCheckIn = DateTime.UtcNow
                 };
                 targetGrunt = await _client.CreateGruntAsync(tempModel);
+                // Console.WriteLine($"[*] Created new Grunt with ID: {targetGrunt.Id}");
             }
             else
             {
+                // Console.WriteLine("[*] TargetGrunt is Uninitialized");
                 targetGrunt.Status = APIModels.GruntStatus.Stage0;
                 targetGrunt.Guid = targetGuid;
                 targetGrunt.LastCheckIn = DateTime.UtcNow;
-                targetGrunt = await _client.EditGruntAsync(targetGrunt);
+                // Console.WriteLine($"[*] updating existing Grunt. : " + targetGrunt.Id);
+                try
+                {
+                    targetGrunt = await _client.EditGruntAsync(targetGrunt);
+                    // Console.WriteLine("[*] Updated existing Grunt.");
+                }
+                catch (HttpOperationException ex)
+                {
+                    // Console.WriteLine($"[!] HttpOperationException while updating Grunt: {ex.Message}");
+                    // this.PushCache(guid, new GruntMessageCacheInfo { Status = GruntMessageCacheStatus.NotFound, Message = "", Tasking = null });
+                    // Environment.Exit(1);
+                }
             }
             if (!egressGruntExists)
             {
+                // Console.WriteLine("[*] No EgressGrunt, setting egressGrunt = targetGrunt.");
                 egressGrunt = targetGrunt;
             }
 
             // EncryptedMessage is the RSA Public Key
+            // Console.WriteLine("[*] Decrypting RSA Public Key...");
             targetGrunt.GruntRSAPublicKey = Convert.ToBase64String(EncryptUtilities.AesDecrypt(
                 gruntStage0Response,
                 Convert.FromBase64String(targetGrunt.GruntSharedSecretPassword)
             ));
+            // Console.WriteLine("[*] RSA Public Key decrypted.");
+
             // Generate negotiated session key
+            // Console.WriteLine("[*] Generating negotiated session key...");
+
             using (Aes newAesKey = Aes.Create())
             {
                 newAesKey.GenerateKey();
                 targetGrunt.GruntNegotiatedSessionKey = Convert.ToBase64String(newAesKey.Key);
                 await _client.EditGruntAsync(targetGrunt);
             }
+            // Console.WriteLine("[*] Negotiated session key generated and saved.");
 
             if (egressGruntExists)
             {
+                // Console.WriteLine("[*] Processing EgressGrunt logic (SMB/Connect)...");
                 // Add this as Child grunt to Grunt that connects it
                 List<APIModels.GruntTasking> taskings = _client.GetAllGruntTaskings().ToList();
                 // TODO: Finding the connectTasking this way could cause race conditions, should fix w/ guid of some sort?
@@ -651,9 +706,11 @@ namespace Covenant.Models.Listeners
                     .FirstOrDefault();
                 if (connectTasking == null)
                 {
+                    // Console.WriteLine("[*] Connect tasking not found, returning NotFound.");
                     this.PushCache(guid, new GruntMessageCacheInfo { Status = GruntMessageCacheStatus.NotFound, Message = "", Tasking = null });
                     return;
                 }
+                // Console.WriteLine($"[*] Connect tasking found: {connectTasking.Id}");
                 ModelUtilities.GruntTaskingMessage tmessage = this.GetGruntTaskingMessage(connectTasking, targetGrunt.DotNetVersion);
                 targetGrunt.Hostname = tmessage.Message.Split(",")[0];
                 await _client.EditGruntAsync(targetGrunt);
@@ -661,23 +718,30 @@ namespace Covenant.Models.Listeners
                 connectTasking.Parameters.Add(targetGrunt.Guid);
                 await _client.EditGruntTaskingAsync(connectTasking);
                 targetGrunt = await _client.GetGruntAsync(targetGrunt.Id ?? default);
+                // Console.WriteLine("[*] Connected Grunt processed.");
             }
 
+            // Console.WriteLine("[*] Encrypting Session Key with RSA...");
             byte[] rsaEncryptedBytes = EncryptUtilities.GruntRSAEncrypt(targetGrunt, Convert.FromBase64String(targetGrunt.GruntNegotiatedSessionKey));
             ModelUtilities.GruntEncryptedMessage message = null;
             try
             {
+                // Console.WriteLine("[*] Creating Message for Grunt...");
                 message = this.CreateMessageForGrunt(egressGrunt, targetGrunt, rsaEncryptedBytes);
+                // Console.WriteLine("[*] Message created.");
             }
-            catch (HttpOperationException)
+            catch (HttpOperationException ex)
             {
+                // Console.WriteLine($"[!] HttpOperationException in CreateMessageForGrunt: {ex.Message}");
                 this.PushCache(guid, new GruntMessageCacheInfo { Status = GruntMessageCacheStatus.NotFound, Message = "", Tasking = null });
                 return;
             }
             // Transform response
             // Stage0Response: "Id,Name,Base64(IV),Base64(AES(RSA(SessionKey))),Base64(HMAC)"
+            // Console.WriteLine("[*] Transforming response...");
             string transformed = this._utilities.ProfileTransform(_transform, Common.CovenantEncoding.GetBytes(JsonConvert.SerializeObject(message)));
             this.PushCache(guid, new GruntMessageCacheInfo { Status = GruntMessageCacheStatus.Ok, Message = transformed, Tasking = null });
+            // Console.WriteLine($"[*] PostStage0 completed for guid: {guid}, returning Ok.");
             return;
         }
 

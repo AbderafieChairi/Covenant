@@ -3,6 +3,7 @@
 // License: GNU GPLv3
 
 using System;
+using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Collections.Concurrent;
@@ -65,6 +66,9 @@ namespace Covenant
                 options.Lockout.AllowedForNewUsers = true;
 
                 options.User.RequireUniqueEmail = false;
+
+                // Configure which claim type contains the user ID
+                options.ClaimsIdentity.UserIdClaimType = System.Security.Claims.ClaimTypes.NameIdentifier;
             });
             services.Configure<ForwardedHeadersOptions>(options =>
             {
@@ -83,9 +87,17 @@ namespace Covenant
             });
 
             JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+            JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Add("nameid", System.Security.Claims.ClaimTypes.NameIdentifier);
             services.AddAuthentication()
                 .AddJwtBearer("JwtBearer", options =>
                 {
+                    var handler = new JwtSecurityTokenHandler();
+                    handler.InboundClaimTypeMap.Clear();
+                    handler.InboundClaimTypeMap.Add("nameid", System.Security.Claims.ClaimTypes.NameIdentifier);
+                    handler.InboundClaimTypeMap.Add("sub", "sub"); // Prevent sub from mapping to NameIdentifier
+                    options.SecurityTokenValidators.Clear();
+                    options.SecurityTokenValidators.Add(handler);
+
                     options.RequireHttpsMetadata = false;
                     options.SaveToken = true;
                     options.TokenValidationParameters = new TokenValidationParameters
@@ -97,6 +109,28 @@ namespace Covenant
                     };
                     options.Events = new JwtBearerEvents
                     {
+                        OnTokenValidated = context =>
+                        {
+                            // Remove the NameIdentifier claim that comes from 'sub' (username)
+                            // Keep only the one with the GUID (user ID)
+                            var identity = context.Principal.Identity as System.Security.Claims.ClaimsIdentity;
+                            if (identity != null)
+                            {
+                                var nameIdClaims = identity.FindAll(System.Security.Claims.ClaimTypes.NameIdentifier).ToList();
+                                if (nameIdClaims.Count > 1)
+                                {
+                                    // Remove the claim with value that doesn't look like a GUID
+                                    foreach (var claim in nameIdClaims)
+                                    {
+                                        if (!Guid.TryParse(claim.Value, out _))
+                                        {
+                                            identity.RemoveClaim(claim);
+                                        }
+                                    }
+                                }
+                            }
+                            return System.Threading.Tasks.Task.CompletedTask;
+                        },
                         OnMessageReceived = context =>
                         {
                             var accessToken = context.Request.Query["access_token"];

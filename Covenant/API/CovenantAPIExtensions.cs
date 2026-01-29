@@ -3,7 +3,7 @@
 // Changes may cause incorrect behavior and will be lost if the code is
 // regenerated.
 // </auto-generated>
-
+using System;
 namespace Covenant.API
 {
     using Models;
@@ -1339,6 +1339,7 @@ namespace Covenant.API
             /// </param>
             public static async Task<Grunt> EditGruntAsync(this ICovenantAPI operations, Grunt body = default(Grunt), CancellationToken cancellationToken = default(CancellationToken))
             {
+                
                 using (var _result = await operations.EditGruntWithHttpMessagesAsync(body, null, cancellationToken).ConfigureAwait(false))
                 {
                     return _result.Body;
